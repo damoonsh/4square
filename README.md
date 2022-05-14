@@ -71,3 +71,47 @@ However there are different ways that this process could be done:
 
 # Modelling
 
+## Experiments
+
+1. Bagging the data using Thresholds
+
+Given multiple threshhold for each column, data is filtered. Meaning that only values that are higher than a threshold is kept. Then a model is trained using this data.
+
+```json
+tdic = {
+    'url_sim': [0.1, 0.3, 0.61, 0.8, 0.91],
+    'cat_union': [0.10, 0.2, 0.33, 0.8],
+    'lon_diff': [0.000178, 0.000690, 0.003257],
+    'lat_diff': [0.000147, 0.0005, 0.001, 0.002, 10, 50],
+    'addr_sim': [0.15, 0.32, 0.55, 0.8, 0.9],
+    'zip_sim': [0.05, 0.1, 0.5, 0.95],
+    'name_sim': [0.2, 0.41, 0.66, 0.91, 0.95],
+    'phone_sim': [0.1, 0.5714, 0.6],
+}
+```
+
+The end goal is to measure the accuracy of aggregated models trained based on thresholds. For the experiment to be general and to make sure every possible aspect is taken into account they are multiple ways that generated data from models can be used to train more models (ensembling). It is important to note that only lightgbm and Xgboost will be used for training the models. Type of data concatenation possible:
+
+1. Features: Only using the generated features. This would be considered a benchmark where the other datasets are compared to see if their increase in accuracy is significant.
+2. Features + xgb predictions
+3. Features + lgbm predictions
+4. xgb predictions
+5. lgbm predictions
+6. Features + lgbm predictions + xgb predictions
+7. lgbm predictions + xgb predictions 
+
+After this, a few light Neural Network architectures will be trained, so we can also see if a Deep Learning ensemble over the threshold models is feasible or not. Lists below show the layers that each Neural Network will have.
+
+```python
+l1 = [tf.keras.layers.Dense(1, activation='sigmoid')]
+l2 = [tf.keras.layers.BatchNormalization(), 
+      tf.keras.layers.Dense(1, activation='sigmoid')]
+l3 = [tf.keras.layers.Dense(8), 
+      tf.keras.layers.Dense(1, activation='sigmoid')]
+l4 = [tf.keras.layers.Dense(16), 
+      tf.keras.layers.Dense(1, activation='sigmoid')]
+l5 = [tf.keras.layers.Dense(8), 
+      tf.keras.layers.Dense(16), 
+      tf.keras.layers.Dense(1, activation='sigmoid')]
+```
+
