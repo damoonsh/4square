@@ -131,7 +131,7 @@ Possible data concatenations:
 6. Features + lgbm predictions + xgb predictions
 7. lgbm predictions + xgb predictions 
 
-Code snippet below shows the process. First the predictions from different models generated from thresholds are generated. Then they are the concatenations that happen between the predictions. After the concatenations, these datasets are passed to eval_data function to get the prediction results from the models (xgb and lgbm) trained on 
+Code snippet below shows the process. First the predictions from different models generated from thresholds are generated. Then they are the concatenations that happen between the predictions. After the concatenations, these datasets are passed to eval_data function to get the prediction results from the models (xgb and lgbm) trained on each dataset.
 
 ```python
 # Getting the threshold Predictions
@@ -146,27 +146,90 @@ xgb_lgbm_preds = pd.concat([xgb_threshold_preds, lgbm_threshold_preds], axis=1)
 # Evaluation Models
 # 1. Benchmark: Running a model with only the generated features
 e1_xgb, e1_lgbm = eval_data(X, 1)
-
 # 2. 
 e2_xgb, e2_lgbm = eval_data(feat_xgb_preds, 2)
-
 # 3. 
 e3_xgb, e3_lgbm = eval_data(feat_lgbm_preds, 3)
-
 # 4. 
 e4_xgb, e4_lgbm = eval_data(xgb_threshold_preds, 4)
-
 # 5.
 e5_xgb, e5_lgbm = eval_data(lgbm_threshold_preds, 5)
-
 # 6.
 e6_xgb, e6_lgbm = eval_data(feat_xgb_lgbm_preds, 6)
-
 # 7.
 e7_xgb, e7_lgbm = eval_data(xgb_lgbm_preds, 7)
 ```
 
+Note: In order to keep the results consistent and focus only the data being passed to the models, all models used have the same set of parameters and all ran through train_models functions to avoid any confusion. This can be seen in eval_model code snippet:
+
+```python
+def eval_data(x, e):
+    # Name of models (for saving)
+    xgb_name, lgbm_name = f'xgb-{e}', f'lgbm-{e}'
+    # Training the models using train_models function
+    xgb, lgbm = train_models(pd.concat([x, y], axis=1), xgb_name, lgbm_name, Features=x.columns)
+    return xgb.predict(x), lgbm.predict(x)
+```
+
+### Results 
+
+They are four metrics that are used for evaluation: Accuracy, F Score, Precision, and Recall. Set of predictions are passed to the gen_metric function and a DataFrame for the performance is created. The predictions for lightgbm and xgboost are passed seperately:
+
+```python
+def gen_metrics(preds):
+    dic = {'F': [], 'Acc': [], 'Pers': [], 'Recall': []}
+    
+    for pred in preds:
+        dic['F'].append(f1_score(pred, y))
+        dic['Acc'].append(accuracy_score(pred, y))
+        dic['Pers'].append(precision_score(pred, y))
+        dic['Recall'].append(recall_score(pred, y))
+    
+    return pd.DataFrame(dic, [f'e{i}' for i in range(1,8)])
+
+xgb_eval_metrics  = gen_metrics([e1_xgb, e2_xgb, e3_xgb, e4_xgb, e5_xgb, e6_xgb, e7_xgb])
+lgbm_eval_metrics = gen_metrics([e1_lgbm, e2_lgbm, e3_lgbm, e4_lgbm, e5_lgbm, e6_lgbm, e7_lgbm])
+```
+
+Results for XGBoost
+
+- e5 is the least accuract accross all metrics
+- e6 is the most accurate accross all metrics
+
+Dataset| F | Accuracy | Precision | Recall
+| --- | --- | --- | ---- | --- |
+e1 | 85.8061 | 79.4490 | 90.1754 | 81.8407 |
+e2 | 87.5104 | 81.9950 | 91.5679 | 83.7973 |
+e3 | 86.0215 | 79.7841 | 90.2981 | 82.1318 |
+e4 | 86.9733 | 81.1797 | 91.2048 | 83.1171 |
+e5 | 85.4536 | 78.9324 | 89.8314 | 81.4826 |
+e6 | 87.6731 | 82.2179 | 91.7984 | 83.9026 |
+e7 | 87.4261 | 81.8461 | 91.6173 | 83.6015 |
+
+Results for LightGBM
+
+- e6 is the most accurate accross all metrics
+- e1 is the leas accuracte accross all metrics
+
+Dataset| F | Accuracy | Precision | Recall
+| --- | --- | --- | ---- | --- |
+e1 | 84.8004 | 77.9412 | 89.3276 | 80.7099 |
+e2 | 86.5277 | 80.5832 | 90.5165 | 82.8756 |
+e3 | 85.1830 | 78.5468 | 89.5209 | 81.2461 |
+e4 | 86.3054 | 80.2060 | 90.5446 | 82.4455 |
+e5 | 85.1572 | 78.4874 | 89.5856 | 81.1460 |
+e6 | 86.8204 | 80.9764 | 90.9606 | 83.0408 |
+e7 | 86.6073 | 80.6544 | 90.8046 | 82.7809 |
+
+
+Based on the results from both models, e6 is the most accurate dataset to train the model on. For most part this is not a surprise since it has the most amount of features but what matters most is to analyze the differences in each metric for diffferent datasets. For each metric, it is easy to see that the e7 follows e6 closely. This tells us that the predictions generated from the threshhold models can yield results close to the dataset where the predictions are concatenated with the features.
+
+Also, in both tables e4 metrics are higher than e5, meaning that the current lgbm model is less accurate than the xgboost model. This encourages parameter tunning for lightgbm. However, it does not guarantee that the xgboost model is perfectly tuned. The parameters used for models are fairly simple, the predictions of threshold models can be used to help with the hypertunning process.
+
+### Ensembling Using Neural Networks
+
 After this, a few light Neural Network architectures will be trained, so we can also see if a Deep Learning ensemble over the threshold models is feasible or not. Lists below show the layers that each Neural Network will have.
+
 
 ```python
 l1 = [tf.keras.layers.Dense(1, activation='sigmoid')]
